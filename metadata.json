@@ -1,0 +1,5 @@
+{
+  "name": "Tagesplaner & Todo-Liste",
+  "description": "Eine interaktive Todo-Liste mit Eisenhower-Matrix zur Priorisierung und einer per Drag & Drop bedienbaren Tagesplan-Kalenderansicht.",
+  "requestFramePermissions": []
+}
