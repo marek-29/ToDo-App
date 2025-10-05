@@ -1,6 +1,6 @@
 import React, { useState, DragEvent, useEffect, MouseEvent as ReactMouseEvent, useCallback, useRef } from 'react';
-import { EisenhowerMatrix, Calendar, CompletedTasks, TaskInput } from './components/IconCard';
-import { Task, QuadrantName } from './types';
+import { EisenhowerMatrix, Calendar, CompletedTasks, TaskInput, TaskCollections as TaskCollectionsComponent } from './components/IconCard';
+import { Task, QuadrantName, TaskCollections } from './types';
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([
@@ -10,6 +10,19 @@ function App() {
     { id: '4', text: 'Social Media scrollen', quadrant: 'delete', completed: true, scheduledTime: null, duration: 1 },
     { id: '5', text: 'Kurzer Check-In Call', quadrant: 'do', completed: false, scheduledTime: 9.5, duration: 0.5 },
   ]);
+
+  const [taskCollections, setTaskCollections] = useState<TaskCollections>({
+    'Projekt A': [
+      { id: 'projA-1', text: 'Konzept finalisieren' },
+      { id: 'projA-2', text: 'Präsentation vorbereiten' },
+      { id: 'projA-3', text: 'Feedback von Stakeholdern einholen' },
+    ],
+    'Privat': [
+      { id: 'priv-1', text: 'Geschenk für Geburtstag kaufen' },
+      { id: 'priv-2', text: 'Urlaub planen' },
+    ],
+  });
+
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [resizingTask, setResizingTask] = useState<string | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -104,6 +117,62 @@ function App() {
     setResizingTask(null);
   }, []);
 
+  const handleCreateCollection = (name: string) => {
+    if (name.trim() === '' || taskCollections[name]) return;
+    setTaskCollections(prev => ({
+      ...prev,
+      [name]: [],
+    }));
+  };
+
+  const handleAddTaskToCollection = (collectionName: string, text: string) => {
+    if (text.trim() === '') return;
+    const newTask = { id: crypto.randomUUID(), text };
+    setTaskCollections(prev => ({
+      ...prev,
+      [collectionName]: [...prev[collectionName], newTask],
+    }));
+  };
+
+  const handleMoveFromCollectionToTodos = (collectionName: string, taskId: string) => {
+    const taskToMove = taskCollections[collectionName].find(t => t.id === taskId);
+    if (!taskToMove) return;
+
+    // Add to main tasks list
+    const newTask: Task = {
+      id: taskToMove.id, // Reuse id, assuming it's unique
+      text: taskToMove.text,
+      quadrant: 'schedule', // Default to 'schedule'
+      completed: false,
+      scheduledTime: null,
+      duration: 1,
+    };
+    setTasks(prev => [...prev, newTask]);
+
+    // Remove from collection
+    setTaskCollections(prev => ({
+      ...prev,
+      [collectionName]: prev[collectionName].filter(t => t.id !== taskId),
+    }));
+  };
+
+  const handleRenameCollection = (oldName: string, newName: string) => {
+    if (newName.trim() === '' || newName === oldName || taskCollections[newName]) {
+      return;
+    }
+    const newCollections = Object.fromEntries(
+      Object.entries(taskCollections).map(([key, value]) =>
+        key === oldName ? [newName, value] : [key, value]
+      )
+    );
+    setTaskCollections(newCollections);
+  };
+
+  const handleDeleteCollection = (name: string) => {
+    const { [name]: _, ...rest } = taskCollections;
+    setTaskCollections(rest);
+  };
+
   useEffect(() => {
     if (resizingTask) {
       window.addEventListener('mousemove', handleResize);
@@ -142,6 +211,14 @@ function App() {
             <CompletedTasks 
               tasks={completedTasks} 
               onToggleComplete={toggleTaskCompletion}
+            />
+            <TaskCollectionsComponent
+              collections={taskCollections}
+              onCreateCollection={handleCreateCollection}
+              onAddTask={handleAddTaskToCollection}
+              onMoveToTodos={handleMoveFromCollectionToTodos}
+              onRenameCollection={handleRenameCollection}
+              onDeleteCollection={handleDeleteCollection}
             />
           </div>
 

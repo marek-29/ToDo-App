@@ -8,3 +8,10 @@ export interface Task {
   scheduledTime: number | null; // Hour from 7 to 19
   duration: number; // Duration in hours
 }
+
+export interface CollectionTask {
+  id: string;
+  text: string;
+}
+
+export type TaskCollections = Record<string, CollectionTask[]>;

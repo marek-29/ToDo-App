@@ -1,6 +1,6 @@
-import React, { DragEvent, FormEvent, useState, MouseEvent as ReactMouseEvent } from 'react';
-import { Task, QuadrantName } from '../types';
-import { FireIcon, CalendarDaysIcon, UsersIcon, TrashIcon, ClockIcon, PlusIcon, CheckIcon } from './Icons';
+import React, { DragEvent, FormEvent, useState, MouseEvent as ReactMouseEvent, useRef, useEffect } from 'react';
+import { Task, QuadrantName, TaskCollections as TaskCollectionsType, CollectionTask } from '../types';
+import { FireIcon, CalendarDaysIcon, UsersIcon, TrashIcon, ClockIcon, PlusIcon, CheckIcon, FolderPlusIcon, ChevronDownIcon, ArrowUpOnSquareIcon, PencilIcon } from './Icons';
 
 // ========== Helpers ==========
 const formatTime = (time: number): string => {
@@ -31,9 +31,9 @@ export const TaskInput: React.FC<TaskInputProps> = ({ onAddTask }) => {
         type="text"
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        placeholder="Neue Aufgabe..."
+        placeholder="Neue Aufgabe für heute..."
         className="flex-grow bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
-        aria-label="Neue Aufgabe"
+        aria-label="Neue Aufgabe für heute"
       />
       <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-5 rounded-xl transition-colors flex items-center gap-2 shadow-sm hover:shadow-md" aria-label="Aufgabe hinzufügen">
         <PlusIcon className="w-5 h-5" />
@@ -323,4 +323,209 @@ export const CompletedTasks: React.FC<CompletedTasksProps> = ({ tasks, onToggleC
       </div>
     </div>
   );
+};
+
+
+// ========== Task Collections ==========
+
+interface CollectionTaskItemProps {
+  task: CollectionTask;
+  onMove: () => void;
+}
+const CollectionTaskItem: React.FC<CollectionTaskItemProps> = ({ task, onMove }) => {
+  return (
+    <div className="group flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 transition-colors">
+      <p className="text-sm text-slate-700">{task.text}</p>
+      <button 
+        onClick={onMove}
+        className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-100 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        aria-label={`Aufgabe "${task.text}" zum Tagesplan hinzufügen`}
+        title="Zum Tagesplan hinzufügen"
+      >
+        <ArrowUpOnSquareIcon className="w-5 h-5" />
+      </button>
+    </div>
+  );
+};
+
+interface AddToCollectionFormProps {
+    collectionName: string;
+    onAddTask: (collectionName: string, text: string) => void;
+}
+const AddToCollectionForm: React.FC<AddToCollectionFormProps> = ({ collectionName, onAddTask }) => {
+    const [text, setText] = useState('');
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        onAddTask(collectionName, text);
+        setText('');
+    }
+    return (
+        <form onSubmit={handleSubmit} className="flex gap-2 mt-2">
+            <input 
+                type="text"
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Neue Aufgabe..."
+                className="flex-grow bg-slate-100 border border-transparent rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                aria-label={`Neue Aufgabe für Sammlung ${collectionName}`}
+            />
+            <button type="submit" className="p-1 rounded-md bg-slate-200 text-slate-600 hover:bg-slate-300" aria-label="Hinzufügen">
+                <PlusIcon className="w-4 h-4" />
+            </button>
+        </form>
+    );
+}
+
+interface CollectionProps {
+    name: string;
+    tasks: CollectionTask[];
+    onAddTask: (collectionName: string, text: string) => void;
+    onMoveToTodos: (collectionName: string, taskId: string) => void;
+    onRename: (oldName: string, newName: string) => void;
+    onDelete: (name: string) => void;
+}
+const Collection: React.FC<CollectionProps> = ({ name, tasks, onAddTask, onMoveToTodos, onRename, onDelete }) => {
+    const [isOpen, setIsOpen] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [newName, setNewName] = useState(name);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleRename = () => {
+        if (newName.trim() && newName.trim() !== name) {
+            onRename(name, newName.trim());
+        }
+        setIsEditing(false);
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Möchten Sie die Sammlung "${name}" und alle darin enthaltenen Aufgaben wirklich löschen?`)) {
+            onDelete(name);
+        }
+    }
+    
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    return (
+        <div className="border-t border-slate-200 last-of-type:border-b py-2">
+            <div className="group w-full flex justify-between items-center p-2 rounded-lg hover:bg-slate-100/80">
+                <div className="flex items-center gap-2 flex-grow min-w-0">
+                    {isEditing ? (
+                        <input
+                            ref={inputRef}
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onBlur={handleRename}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRename();
+                                if (e.key === 'Escape') {
+                                    setNewName(name);
+                                    setIsEditing(false);
+                                }
+                            }}
+                            className="font-semibold text-slate-700 bg-white border border-blue-400 rounded-md px-1 py-0.5 -ml-1 w-full"
+                            aria-label={`Neuer Name für Sammlung ${name}`}
+                        />
+                    ) : (
+                        <h3 className="font-semibold text-slate-700 truncate" title={name}>{name}</h3>
+                    )}
+                </div>
+                <div className="flex items-center">
+                     <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button 
+                            onClick={() => setIsEditing(true)}
+                            className="p-1 rounded-md text-slate-500 hover:text-blue-600 hover:bg-blue-100"
+                            aria-label={`Sammlung ${name} umbenennen`}
+                            title="Umbenennen"
+                         >
+                             <PencilIcon className="w-4 h-4" />
+                         </button>
+                         <button 
+                             onClick={handleDelete}
+                             className="p-1 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-100"
+                             aria-label={`Sammlung ${name} löschen`}
+                             title="Löschen"
+                         >
+                             <TrashIcon className="w-4 h-4" />
+                         </button>
+                     </div>
+                     <button onClick={() => setIsOpen(!isOpen)} className="p-1 rounded-md text-slate-500 hover:bg-slate-200" aria-label={isOpen ? 'Sammlung einklappen' : 'Sammlung ausklappen'}>
+                        <ChevronDownIcon className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+            </div>
+            {isOpen && (
+                <div className="pl-2 pr-1 pt-1 pb-2">
+                    {tasks.length > 0 ? (
+                        tasks.map(task => (
+                            <CollectionTaskItem 
+                                key={task.id} 
+                                task={task} 
+                                onMove={() => onMoveToTodos(name, task.id)}
+                            />
+                        ))
+                    ) : (
+                        <p className="text-sm text-slate-400 px-2 italic">Keine Aufgaben hier.</p>
+                    )}
+                    <AddToCollectionForm collectionName={name} onAddTask={onAddTask} />
+                </div>
+            )}
+        </div>
+    );
+};
+
+interface TaskCollectionsProps {
+    collections: TaskCollectionsType;
+    onCreateCollection: (name: string) => void;
+    onAddTask: (collectionName: string, text: string) => void;
+    onMoveToTodos: (collectionName: string, taskId: string) => void;
+    onRenameCollection: (oldName: string, newName: string) => void;
+    onDeleteCollection: (name: string) => void;
+}
+export const TaskCollections: React.FC<TaskCollectionsProps> = ({ collections, onCreateCollection, onAddTask, onMoveToTodos, onRenameCollection, onDeleteCollection }) => {
+    const [newCollectionName, setNewCollectionName] = useState('');
+
+    const handleCreateCollection = (e: FormEvent) => {
+        e.preventDefault();
+        onCreateCollection(newCollectionName);
+        setNewCollectionName('');
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-200/80">
+            <h2 className="text-2xl font-bold mb-4 px-2 text-slate-800">Aufgaben-Sammlungen</h2>
+            
+            <form onSubmit={handleCreateCollection} className="flex gap-3 mb-4 px-2">
+                <input
+                    type="text"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                    placeholder="Neue Sammlung erstellen..."
+                    className="flex-grow bg-white border border-slate-300 rounded-xl px-4 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm text-sm"
+                    aria-label="Neue Sammlung erstellen"
+                />
+                <button type="submit" className="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-xl transition-colors flex items-center gap-2 shadow-sm hover:shadow-md" aria-label="Sammlung erstellen">
+                    <FolderPlusIcon className="w-5 h-5" />
+                </button>
+            </form>
+
+            <div>
+                {Object.entries(collections).map(([name, tasks]) => (
+                    <Collection
+                        key={name}
+                        name={name}
+                        tasks={tasks}
+                        onAddTask={onAddTask}
+                        onMoveToTodos={onMoveToTodos}
+                        onRename={onRenameCollection}
+                        onDelete={onDeleteCollection}
+                    />
+                ))}
+            </div>
+        </div>
+    );
 };
